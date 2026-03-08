@@ -8,8 +8,8 @@ import './globals.css'
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: 'AI Learning Coach',
-  description: 'Personalized learning paths powered by AI - master any skill with adaptive learning',
+  title: 'MapScribe.ai',
+  description: 'MapScribe.ai – personalized learning paths and knowledge graphs for any topic.',
   generator: 'v0.app',
   icons: {
     icon: [

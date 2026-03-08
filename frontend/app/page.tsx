@@ -82,13 +82,11 @@ export default function DashboardPage() {
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Concepts Learned" value={data.conceptsLearned}
-            description={`${data.conceptsThisWeek} this week`} icon={BookOpen}
-            trend={{ value: data.conceptsThisWeek > 0 ? 12 : 0, isPositive: true }} />
+            description={`${data.conceptsThisWeek} active days this week`} icon={BookOpen} />
           <StatCard title="Average Skill Level" value={data.averageSkillLevel}
             description="Based on your graph" icon={Target} />
           <StatCard title="Learning Streak" value={`${data.learningStreak} Days`}
-            description="Keep it up!" icon={TrendingUp}
-            trend={{ value: data.learningStreak > 0 ? 50 : 0, isPositive: true }} />
+            description="Consecutive active days" icon={TrendingUp} />
           <StatCard title="Overall Progress" value={`${data.overallProgress}%`}
             description="Concepts completed" icon={Clock} />
         </div>

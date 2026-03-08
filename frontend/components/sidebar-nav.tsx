@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
@@ -13,7 +14,6 @@ import {
   BookOpen,
   Lightbulb,
   PlayCircle,
-  Brain,
   Sparkles,
   LogOut,
   X,
@@ -49,11 +49,6 @@ const navItems = [
     icon: Target,
   },
   {
-    title: "Recommendations",
-    href: "/recommendations",
-    icon: Lightbulb,
-  },
-  {
     title: "Resources",
     href: "/resources",
     icon: PlayCircle,
@@ -74,8 +69,14 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       {/* Logo */}
       <div className="flex h-20 items-center justify-between border-b border-sidebar-border px-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary">
-            <Brain className="h-7 w-7 text-primary-foreground" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary overflow-hidden">
+            <Image
+              src="/logo-mapscribe.png"
+              alt="MapScribe.ai"
+              width={48}
+              height={48}
+              className="h-full w-full object-contain"
+            />
           </div>
           <span className="text-xl font-bold tracking-tight text-sidebar-foreground">MapScribe.ai</span>
         </div>
