@@ -2,10 +2,6 @@
   <img src="assets/banner.png" alt="MapScribe.ai" width="800"/>
 </div>
 
-# MapScribe.ai
-
-An AI-powered learning platform...
-
 
 # MapScribe.ai
 
