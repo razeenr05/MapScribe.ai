@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "***REMOVED***")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./hackai_dev.db")
 
 # connect_args only needed for SQLite (for local dev without Docker)
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}

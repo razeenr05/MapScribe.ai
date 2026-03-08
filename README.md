@@ -113,7 +113,7 @@ GOOGLE_CLIENT_ID=your_google_oauth_web_client_id.apps.googleusercontent.com
 
 # --- DATABASE CONFIG ---
 # Default configuration for the Docker Compose postgres service
-DATABASE_URL=***REMOVED***
+DATABASE_URL=postgresql://admin:password123@mapscribe_db:5432/mapscribe_db
 
 # --- ENVIRONMENT ---
 NODE_ENV=development

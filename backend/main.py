@@ -309,27 +309,49 @@ def generate_graph(payload: GenerateGraphRequest, db: Session = Depends(get_db))
 
     graph = generate_knowledge_graph(payload.goal)
 
-    # Lightly clean up edges from the model to avoid overly dense graphs:
-    # - Keep at most 3 prerequisites per node
-    # - Prefer prerequisites from lower or equal levels
     nodes_by_id = {n["id"]: n for n in graph.get("nodes", [])}
-    level_of = {nid: int(nodes_by_id[nid].get("level", 0)) for nid in nodes_by_id}
+    raw_edges = graph.get("edges", [])
+
+    # Infer levels from graph structure (AI often returns all level 0)
+    prereq_map: dict[str, list[str]] = {}
+    children_map: dict[str, list[str]] = {}
+    for e in raw_edges:
+        src, tgt = e.get("source"), e.get("target")
+        if src and tgt and src != tgt:
+            prereq_map.setdefault(tgt, []).append(src)
+            children_map.setdefault(src, []).append(tgt)
+    roots = [n["id"] for n in graph["nodes"] if n["id"] not in prereq_map or not prereq_map[n["id"]]]
+    if not roots and graph["nodes"]:
+        roots = [graph["nodes"][0]["id"]]
+    level_of: dict[str, int] = {}
+    queue = [(r, 0) for r in roots]
+    while queue:
+        nid, d = queue.pop(0)
+        if nid in level_of and level_of[nid] <= d:
+            continue
+        level_of[nid] = d
+        for c in children_map.get(nid, []):
+            queue.append((c, d + 1))
+    for n in graph["nodes"]:
+        if n["id"] not in level_of:
+            level_of[n["id"]] = max(level_of.values(), default=0) + 1
+        n["level"] = level_of[n["id"]]
+
+    # Clean edges: keep at most 3 prerequisites per node, prefer lower-level parents
     per_target: dict[str, list[tuple[int, str]]] = {}
-    for e in graph.get("edges", []):
+    for e in raw_edges:
         src_id = e.get("source")
         tgt_id = e.get("target")
         if not src_id or not tgt_id or src_id == tgt_id:
             continue
         src_level = level_of.get(src_id, 0)
         tgt_level = level_of.get(tgt_id, 0)
-        # Prefer edges from lower or equal level to higher level nodes
         if src_level > tgt_level:
             continue
         per_target.setdefault(tgt_id, []).append((src_level, src_id))
 
     cleaned_edges: list[dict] = []
     for tgt_id, src_list in per_target.items():
-        # sort by level, then by id for stability
         src_list.sort(key=lambda t: (t[0], t[1]))
         for _, src_id in src_list[:3]:
             cleaned_edges.append({"source": src_id, "target": tgt_id})
@@ -666,10 +688,12 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         practice_map.setdefault(r.node_id, set()).add(r.problem_index)
 
     # Skill overview: mastery 0–5 per node, based on completion + practice
+    # Sort nodes by level so chart shows foundation topics first
+    sorted_nodes = sorted(all_nodes, key=lambda n: (n.level, n.label))
     skill_values: list[float] = []
     skill_data = []
     mastery_by_id: dict[str, float] = {}
-    for n in all_nodes:
+    for n in sorted_nodes:
         total_pp = len(n.practice_problems)
         done_pp = len(practice_map.get(n.id, set()))
         if n.id in completed_ids:
@@ -683,7 +707,6 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         skill_values.append(value)
         skill_data.append({"subject": n.label[:20], "value": value, "fullMark": 5})
     avg_level = round(sum(skill_values) / len(skill_values), 1) if skill_values else 0.0
-    skill_data = skill_data[:6]
 
     # Knowledge gaps: concepts marked weak or in-progress and not yet completed
     weak_nodes = [n for n in all_nodes if n.status in ("weak", "in-progress") and n.id not in completed_ids]
