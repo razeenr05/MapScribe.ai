@@ -72,15 +72,12 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-6">
+      <div className="flex h-20 items-center justify-between border-b border-sidebar-border px-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-            <Brain className="h-5 w-5 text-primary-foreground" />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary">
+            <Brain className="h-7 w-7 text-primary-foreground" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">AI Learning Coach</span>
-            <span className="text-xs text-muted-foreground">Personalized Learning</span>
-          </div>
+          <span className="text-xl font-bold tracking-tight text-sidebar-foreground">MapScribe.ai</span>
         </div>
         {onClose && (
           <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={onClose}>
@@ -89,8 +86,8 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      {/* Navigation — large labels, start at top */}
+      <nav className="flex-1 flex flex-col justify-start gap-0.5 px-3 pt-4 min-h-0 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = pathname === item.href
           return (
@@ -99,13 +96,13 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               href={item.href}
               onClick={onClose}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-3 py-3.5 text-lg font-medium transition-colors",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-accent-foreground"
                   : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
               )}
             >
-              <item.icon className={cn("h-4 w-4", isActive && "text-primary")} />
+              <item.icon className={cn("h-6 w-6 shrink-0", isActive && "text-primary")} />
               {item.title}
             </Link>
           )
