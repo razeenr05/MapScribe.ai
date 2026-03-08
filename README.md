@@ -1,3 +1,12 @@
+<div align="center">
+  <img src="assets/banner.webp" alt="MapScribe.ai" width="800"/>
+</div>
+
+# MapScribe.ai
+
+An AI-powered learning platform...
+
+
 # MapScribe.ai
 
 An AI-powered learning platform that turns any topic into an interactive, personalized knowledge graph. Type a subject and Gemini AI generates a structured mind map of everything you need to learn, in the right order, with real resources and practice problems at every step.
