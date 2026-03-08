@@ -44,10 +44,10 @@ export function ConceptPanel({ concept, onClose, onMarkStart, onMarkComplete, on
   const isInProgress  = concept.status === "in-progress"
   const isLocked      = concept.status === "locked"
   const isStartable   = concept.status === "recommended" || concept.status === "weak"
-   const isWeak       = concept.status === "weak"
+  const isWeak        = concept.status === "weak"
 
   return (
-    <div className="absolute right-4 top-4 z-50 w-96 rounded-xl border border-border bg-card shadow-xl">
+    <div className="fixed right-4 top-4 bottom-4 z-50 w-96 rounded-xl border border-border bg-card shadow-xl flex flex-col">
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-3">
           <h3 className="font-semibold text-card-foreground">{concept.label}</h3>
@@ -58,8 +58,9 @@ export function ConceptPanel({ concept, onClose, onMarkStart, onMarkComplete, on
         </Button>
       </div>
 
-      <ScrollArea className="h-[calc(100vh-200px)] max-h-[500px]">
-        <div className="p-4 space-y-5">
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-5 pr-2">
 
           {/* Skill level */}
           <div>
@@ -143,8 +144,9 @@ export function ConceptPanel({ concept, onClose, onMarkStart, onMarkComplete, on
               </div>
             </>
           )}
-        </div>
-      </ScrollArea>
+          </div>
+        </ScrollArea>
+      </div>
 
       {/* Action buttons */}
       <div className="p-4 border-t border-border space-y-2">

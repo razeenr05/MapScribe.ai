@@ -40,6 +40,7 @@ export default function LearnPage() {
   const [goal, setGoal] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [shuffledSuggestions, setShuffledSuggestions] = useState<string[]>([])
   const [pastGoals, setPastGoals] = useState<LearningGoalItem[]>([])
   const [loadingPast, setLoadingPast] = useState(true)
   const [resumingId, setResumingId] = useState<number | null>(null)
@@ -52,6 +53,15 @@ export default function LearnPage() {
       .then((list: LearningGoalItem[]) => setPastGoals(Array.isArray(list) ? list : []))
       .catch(() => setPastGoals([]))
       .finally(() => setLoadingPast(false))
+
+    // Randomize suggestion order on each page load
+    const pool = [...suggestions]
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[pool[i], pool[j]] = [pool[j], pool[i]]
+    }
+    // Show up to 8 randomized suggestions
+    setShuffledSuggestions(pool.slice(0, 8))
   }, [])
 
   const handleSubmit = async (value: string) => {
@@ -188,7 +198,7 @@ export default function LearnPage() {
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground text-center">Or try one of these</p>
             <div className="flex flex-wrap gap-2 justify-center">
-              {suggestions.map((s) => (
+              {(shuffledSuggestions.length ? shuffledSuggestions : suggestions).map((s) => (
                 <Badge
                   key={s}
                   variant="secondary"

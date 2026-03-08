@@ -1,12 +1,13 @@
 "use client"
 
+import Image from "next/image"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Loader2, MapPin, ArrowRight, Sparkles, Network, BookOpen } from "lucide-react"
+import { Loader2, ArrowRight, Sparkles, Network, BookOpen } from "lucide-react"
 
 declare global {
   interface Window { google?: any }
@@ -97,8 +98,14 @@ export default function AuthPage() {
 
         {/* Logo */}
         <div className="relative z-10 flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary border border-primary/20">
-            <MapPin className="h-8 w-8 text-primary-foreground" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary border border-primary/20 overflow-hidden">
+            <Image
+              src="/logo-mapscribe.png"
+              alt="MapScribe.ai"
+              width={64}
+              height={64}
+              className="h-full w-full object-contain"
+            />
           </div>
           <span className="text-3xl font-bold text-sidebar-foreground tracking-tight">MapScribe.ai</span>
         </div>
@@ -144,8 +151,14 @@ export default function AuthPage() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-border dark:border-white/5">
           {/* Mobile logo */}
           <div className="flex items-center gap-2 lg:hidden">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
-              <MapPin className="h-4 w-4 text-primary-foreground" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary overflow-hidden">
+              <Image
+                src="/logo-mapscribe.png"
+                alt="MapScribe.ai"
+                width={28}
+                height={28}
+                className="h-full w-full object-contain"
+              />
             </div>
             <span className="font-semibold text-foreground text-sm">MapScribe.ai</span>
           </div>

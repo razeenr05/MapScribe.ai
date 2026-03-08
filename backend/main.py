@@ -308,6 +308,33 @@ def generate_graph(payload: GenerateGraphRequest, db: Session = Depends(get_db))
         goal_id = existing_goal_row.id
 
     graph = generate_knowledge_graph(payload.goal)
+
+    # Lightly clean up edges from the model to avoid overly dense graphs:
+    # - Keep at most 3 prerequisites per node
+    # - Prefer prerequisites from lower or equal levels
+    nodes_by_id = {n["id"]: n for n in graph.get("nodes", [])}
+    level_of = {nid: int(nodes_by_id[nid].get("level", 0)) for nid in nodes_by_id}
+    per_target: dict[str, list[tuple[int, str]]] = {}
+    for e in graph.get("edges", []):
+        src_id = e.get("source")
+        tgt_id = e.get("target")
+        if not src_id or not tgt_id or src_id == tgt_id:
+            continue
+        src_level = level_of.get(src_id, 0)
+        tgt_level = level_of.get(tgt_id, 0)
+        # Prefer edges from lower or equal level to higher level nodes
+        if src_level > tgt_level:
+            continue
+        per_target.setdefault(tgt_id, []).append((src_level, src_id))
+
+    cleaned_edges: list[dict] = []
+    for tgt_id, src_list in per_target.items():
+        # sort by level, then by id for stability
+        src_list.sort(key=lambda t: (t[0], t[1]))
+        for _, src_id in src_list[:3]:
+            cleaned_edges.append({"source": src_id, "target": tgt_id})
+
+    graph["edges"] = cleaned_edges
     positions = _layout_nodes(graph["nodes"], graph["edges"])
     node_id_map = {}
     for n in graph["nodes"]:
@@ -390,7 +417,8 @@ def get_mindmap(
         elif prereqs and not all(p in completed_ids for p in prereqs):
             status = "locked"
         else:
-            status = node.status
+            # If prerequisites are satisfied, automatically treat locked nodes as recommended
+            status = "recommended" if node.status == "locked" else node.status
         flow_nodes.append(FlowNode(id=node.id, position={"x": node.position_x, "y": node.position_y}, type="concept",
             data=NodeData(label=node.label, status=status, level=node.level, description=node.description)))
     flow_edges = []
@@ -486,7 +514,7 @@ def check_unlock(user_id: str, node_id: str, db: Session = Depends(get_db)):
 @app.post("/api/generate-choices", tags=["practice"])
 def generate_choices(payload: MultipleChoiceRequest):
     """Generate 4 multiple-choice options for a practice question, with the correct answer marked."""
-    import urllib.request, urllib.error
+    import urllib.request, urllib.error, random
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
@@ -523,18 +551,32 @@ Reply ONLY with valid JSON, no markdown:
             if text.endswith("```"):
                 text = text.rsplit("```", 1)[0]
             parsed = json.loads(text.strip())
+            choices = list(parsed.get("choices", []))
+            if len(choices) != 4:
+                # Basic safety: ensure exactly 4 choices
+                choices = (choices + ["Option A", "Option B", "Option C", "Option D"])[:4]
+            original_correct = int(parsed.get("correct_index", 0))
+            indexed = list(enumerate(choices))
+            random.shuffle(indexed)
+            shuffled_choices = [c for _, c in indexed]
+            # Find where the original correct choice moved to
+            new_correct_index = next(
+                (i for i, (orig_idx, _) in enumerate(indexed) if orig_idx == original_correct),
+                0,
+            )
             return {
-                "choices": parsed["choices"],
-                "correct_index": int(parsed["correct_index"]),
+                "choices": shuffled_choices,
+                "correct_index": new_correct_index,
                 "explanation": parsed.get("explanation", "")
             }
         except urllib.error.HTTPError:
             continue
         except Exception:
             continue
+    fallback_choices = ["Option A", "Option B", "Option C", "Option D"]
     return {
-        "choices": ["Option A", "Option B", "Option C", "Option D"],
-        "correct_index": 0,
+        "choices": fallback_choices,
+        "correct_index": random.randint(0, len(fallback_choices) - 1),
         "explanation": "Could not generate choices."
     }
 
@@ -591,6 +633,8 @@ Be fair but accurate. Score above 70 means the student demonstrated understandin
 @app.get("/api/dashboard/{user_id}", tags=["dashboard"])
 def get_dashboard(user_id: str, db: Session = Depends(get_db)):
     from datetime import date, timedelta
+
+    # Scope nodes to the user's current goal (if any)
     row = db.query(models.UserGoal).filter(models.UserGoal.user_id == user_id).first()
     goal_id = row.goal_id if row else None
     if goal_id is not None:
@@ -599,21 +643,67 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         ).all()
     else:
         all_nodes = db.query(models.Node).filter(models.Node.user_id == user_id).all()
-    completed_ids = {r.node_id for r in db.query(models.UserProgress).filter(models.UserProgress.user_id == user_id).all()}
-    completed_ids = completed_ids & {n.id for n in all_nodes}
+
+    user_node_ids = {n.id for n in all_nodes}
+
+    # Completion and progress
+    completed_rows = db.query(models.UserProgress).filter(
+        models.UserProgress.user_id == user_id,
+        models.UserProgress.node_id.in_(user_node_ids),
+    ).all()
+    completed_ids = {r.node_id for r in completed_rows}
     total = len(all_nodes)
     completed = len(completed_ids)
     overall_progress = round((completed / total) * 100) if total > 0 else 0
-    avg_level = round(sum(n.level for n in all_nodes) / total, 1) if total > 0 else 0.0
-    weak_nodes = [n for n in all_nodes if n.status in ("weak", "in-progress") and n.id not in completed_ids]
-    knowledge_gaps = [{"name": n.label, "level": n.level, "status": "weak"} for n in weak_nodes[:3]]
-    recommended_nodes = [n for n in all_nodes if n.status == "recommended" and n.id not in completed_ids]
-    recommended_topics = [{"title": n.label, "description": n.description or "", "reason": "Next on your learning path",
-        "improvement": "Unlock the next topics", "difficulty": "Beginner" if n.level <= 1 else "Intermediate" if n.level <= 3 else "Advanced",
-        "href": f"/practice?topic={n.label}"} for n in recommended_nodes[:2]]
-    skill_data = [{"subject": n.label[:20], "value": n.level, "fullMark": 5} for n in all_nodes[:6]]
 
-    # Calculate real streak from activity table
+    # Practice completion per node
+    practice_rows = db.query(models.UserPracticeCompletion).filter(
+        models.UserPracticeCompletion.user_id == user_id,
+        models.UserPracticeCompletion.node_id.in_(user_node_ids),
+    ).all()
+    practice_map: dict[str, set[int]] = {}
+    for r in practice_rows:
+        practice_map.setdefault(r.node_id, set()).add(r.problem_index)
+
+    # Skill overview: mastery 0–5 per node, based on completion + practice
+    skill_values: list[float] = []
+    skill_data = []
+    mastery_by_id: dict[str, float] = {}
+    for n in all_nodes:
+        total_pp = len(n.practice_problems)
+        done_pp = len(practice_map.get(n.id, set()))
+        if n.id in completed_ids:
+            mastery = 1.0
+        elif total_pp > 0:
+            mastery = done_pp / total_pp
+        else:
+            mastery = 0.0
+        value = round(mastery * 5.0, 1)
+        mastery_by_id[n.id] = value
+        skill_values.append(value)
+        skill_data.append({"subject": n.label[:20], "value": value, "fullMark": 5})
+    avg_level = round(sum(skill_values) / len(skill_values), 1) if skill_values else 0.0
+    skill_data = skill_data[:6]
+
+    # Knowledge gaps: concepts marked weak or in-progress and not yet completed
+    weak_nodes = [n for n in all_nodes if n.status in ("weak", "in-progress") and n.id not in completed_ids]
+    knowledge_gaps = [{"name": n.label, "level": mastery_by_id.get(n.id, 0.0), "status": "weak"} for n in weak_nodes[:3]]
+
+    # Recommended next concepts: prefer explicit "recommended" status, otherwise any uncompleted nodes
+    recommended_nodes = [n for n in all_nodes if n.status == "recommended" and n.id not in completed_ids]
+    if not recommended_nodes:
+        remaining = [n for n in all_nodes if n.id not in completed_ids]
+        recommended_nodes = remaining[:2]
+    recommended_topics = [{
+        "title": n.label,
+        "description": n.description or "",
+        "reason": "Next on your learning path",
+        "improvement": "Unlock the next topics",
+        "difficulty": "Beginner" if mastery_by_id.get(n.id, 0.0) <= 1.5 else "Intermediate" if mastery_by_id.get(n.id, 0.0) <= 3.5 else "Advanced",
+        "href": f"/practice?topic={n.label}",
+    } for n in recommended_nodes[:2]]
+
+    # Activity-based streak and "this week" count
     activity_rows = db.query(models.UserActivity).filter(
         models.UserActivity.user_id == user_id
     ).order_by(models.UserActivity.activity_date.desc()).all()
@@ -624,10 +714,23 @@ def get_dashboard(user_id: str, db: Session = Depends(get_db)):
         streak += 1
         check_date -= timedelta(days=1)
 
-    return {"conceptsLearned": completed, "conceptsThisWeek": min(completed, 3), "averageSkillLevel": f"{avg_level}/5",
-        "learningStreak": streak, "timeSpentHours": 0, "overallProgress": overall_progress, "skillData": skill_data,
+    week_start = date.today() - timedelta(days=6)
+    concepts_this_week = sum(
+        1 for d in activity_dates if week_start.isoformat() <= d <= date.today().isoformat()
+    )
+
+    return {
+        "conceptsLearned": completed,
+        "conceptsThisWeek": concepts_this_week,
+        "averageSkillLevel": f"{avg_level}/5",
+        "learningStreak": streak,
+        "timeSpentHours": 0,
+        "overallProgress": overall_progress,
+        "skillData": skill_data,
         "progressData": [{"date": "Start", "progress": 0}, {"date": "Now", "progress": overall_progress}],
-        "knowledgeGaps": knowledge_gaps, "recommendedTopics": recommended_topics}
+        "knowledgeGaps": knowledge_gaps,
+        "recommendedTopics": recommended_topics,
+    }
 
 
 @app.get("/api/recommendations/{user_id}", tags=["recommendations"])
@@ -640,8 +743,11 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
         ).all()
     else:
         all_nodes = db.query(models.Node).filter(models.Node.user_id == user_id).all()
-    completed_ids = {r.node_id for r in db.query(models.UserProgress).filter(models.UserProgress.user_id == user_id).all()}
     user_node_ids = {n.id for n in all_nodes}
+    completed_ids = {r.node_id for r in db.query(models.UserProgress).filter(
+        models.UserProgress.user_id == user_id,
+        models.UserProgress.node_id.in_(user_node_ids),
+    ).all()}
     db_edges = db.query(models.Edge).filter(models.Edge.source_id.in_(user_node_ids)).all()
     prereq_label_map: dict[str, list[str]] = {}
     node_by_id = {n.id: n for n in all_nodes}
@@ -649,14 +755,36 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
         src = node_by_id.get(e.source_id)
         if src:
             prereq_label_map.setdefault(e.target_id, []).append(src.label)
+
+    # Practice completion per node
+    practice_rows = db.query(models.UserPracticeCompletion).filter(
+        models.UserPracticeCompletion.user_id == user_id,
+        models.UserPracticeCompletion.node_id.in_(user_node_ids),
+    ).all()
+    practice_map: dict[str, set[int]] = {}
+    for r in practice_rows:
+        practice_map.setdefault(r.node_id, set()).add(r.problem_index)
+
+    mastery_by_id: dict[str, float] = {}
+    for n in all_nodes:
+        total_pp = len(n.practice_problems)
+        done_pp = len(practice_map.get(n.id, set()))
+        if n.id in completed_ids:
+            mastery = 1.0
+        elif total_pp > 0:
+            mastery = done_pp / total_pp
+        else:
+            mastery = 0.0
+        mastery_by_id[n.id] = round(mastery * 5.0, 1)
+
     total = len(all_nodes)
-    avg_level = round(sum(n.level for n in all_nodes) / total, 1) if total > 0 else 0.0
+    avg_level = round(sum(mastery_by_id.values()) / total, 1) if total > 0 else 0.0
     status_priority = {"weak": 0, "recommended": 1, "in-progress": 2, "locked": 3}
     candidates = sorted([n for n in all_nodes if n.id not in completed_ids], key=lambda n: status_priority.get(n.status, 99))
     recommendations = []
     for n in candidates[:6]:
-        current_lvl = n.level
-        predicted_lvl = min(5, current_lvl + 2)
+        current_lvl = mastery_by_id.get(n.id, 0.0)
+        predicted_lvl = min(5.0, current_lvl + 2.0)
         priority = "High" if n.status == "weak" else "Medium" if n.status in ("recommended", "in-progress") else "Low"
         learning_path = [{"step": p, "completed": False} for p in n.practice_problems[:4]]
         if not learning_path:
@@ -673,12 +801,36 @@ def get_recommendations(user_id: str, db: Session = Depends(get_db)):
             "timeEstimate": "1-2 hours" if priority == "High" else "2-3 hours",
             "priority": priority, "prerequisites": prereq_label_map.get(n.id, []),
             "benefits": benefits, "learningPath": learning_path})
-    completed_nodes = [n for n in all_nodes if n.id in completed_ids]
-    skill_predictions = [{"skill": n.label[:20], "current": n.level, "predicted": n.level, "change": "+0"} for n in completed_nodes[:3]]
+    # Skill predictions: focus on topics that are not yet mastered (< 5/5)
+    improv_candidates = [n for n in all_nodes if mastery_by_id.get(n.id, 0.0) < 5.0]
+    improv_candidates.sort(key=lambda n: mastery_by_id.get(n.id, 0.0))
+    skill_predictions = []
+    for n in improv_candidates[:3]:
+        current_lvl = mastery_by_id.get(n.id, 0.0)
+        predicted_lvl = min(5.0, current_lvl + 2.0)
+        delta = round(predicted_lvl - current_lvl, 1)
+        skill_predictions.append({
+            "skill": n.label[:20],
+            "current": current_lvl,
+            "predicted": predicted_lvl,
+            "change": f"+{delta}" if delta > 0 else "+0",
+        })
     predicted_avg = round(min(5.0, avg_level + 0.8), 1)
-    skill_predictions.append({"skill": "Overall", "current": avg_level, "predicted": predicted_avg, "change": f"+{round(predicted_avg - avg_level, 1)}"})
-    quick_wins = [{"topic": n.label, "time": "30 min", "boost": f"+{10 + n.level * 5}%"}
-        for n in sorted([n for n in all_nodes if n.id not in completed_ids and n.level <= 2], key=lambda n: n.level)[:4]]
+    skill_predictions.append({
+        "skill": "Overall",
+        "current": avg_level,
+        "predicted": predicted_avg,
+        "change": f"+{round(predicted_avg - avg_level, 1)}",
+    })
+    quick_wins = []
+    for n in sorted([n for n in all_nodes if n.id not in completed_ids and n.level <= 2], key=lambda n: n.level)[:4]:
+        if n.level <= 1:
+            time = "30 min"
+        elif n.level == 2:
+            time = "45 min"
+        else:
+            time = "60 min"
+        quick_wins.append({"topic": n.label, "time": time, "boost": f"+{10 + n.level * 5}%"})
     return {"recommendations": recommendations, "skillPredictions": skill_predictions, "quickWins": quick_wins}
 
 
