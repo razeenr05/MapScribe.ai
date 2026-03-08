@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { AppShell } from "@/components/app-shell"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle2, Sparkles, Loader2, Search, ArrowRight, BookOpen } from "lucide-react"
+import { ArrowRight, BookOpen, Lightbulb, Target, Zap, Loader2 } from "lucide-react"
+import { RecommendationCard } from "@/components/cards/recommendation-card"
 
 interface NodeSkill {
   id: string
@@ -18,14 +18,43 @@ interface NodeSkill {
   description: string
 }
 
+interface Recommendation {
+  id: string
+  topic: string
+  category: string
+  reason: string
+  currentLevel: number
+  predictedLevel: number
+  timeEstimate: string
+  priority: "High" | "Medium" | "Low"
+  prerequisites: string[]
+  benefits: string[]
+  learningPath: { step: string; completed: boolean }[]
+}
+
+interface SkillPrediction {
+  skill: string
+  current: number
+  predicted: number
+  change: string
+}
+
+interface QuickWin {
+  topic: string
+  time: string
+  boost: string
+}
+
 export default function AssessmentPage() {
   const router = useRouter()
-  const [goal,         setGoal]         = useState("")
-  const [generating,   setGenerating]   = useState(false)
-  const [genStatus,    setGenStatus]    = useState<"idle" | "success" | "error">("idle")
   const [nodes,        setNodes]        = useState<NodeSkill[]>([])
   const [loadingNodes, setLoadingNodes] = useState(true)
   const [savedGoal,    setSavedGoal]    = useState("")
+  const [avgLevelDisplay, setAvgLevelDisplay] = useState<string>("—")
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const [skillPredictions, setSkillPredictions] = useState<SkillPrediction[]>([])
+  const [quickWins, setQuickWins] = useState<QuickWin[]>([])
+  const [loadingRecs, setLoadingRecs] = useState(true)
 
   useEffect(() => {
     const uid = localStorage.getItem("hackai_user_id") || "user-1"
@@ -33,8 +62,8 @@ export default function AssessmentPage() {
 
     fetch(`http://localhost:8000/api/goal/${uid}`)
       .then(r => r.json())
-      .then(d => { const g = d.goal || localGoal; setSavedGoal(g); setGoal(g) })
-      .catch(() => { setSavedGoal(localGoal); setGoal(localGoal) })
+      .then(d => { const g = d.goal || localGoal; setSavedGoal(g) })
+      .catch(() => { setSavedGoal(localGoal) })
 
     fetch(`http://localhost:8000/api/mindmap/${uid}`)
       .then(r => r.json())
@@ -46,32 +75,31 @@ export default function AssessmentPage() {
         setLoadingNodes(false)
       })
       .catch(() => setLoadingNodes(false))
+
+    fetch(`http://localhost:8000/api/recommendations/${uid}`)
+      .then(r => r.json())
+      .then((d) => {
+        setRecommendations(d.recommendations || [])
+        setSkillPredictions(d.skillPredictions || [])
+        setQuickWins(d.quickWins || [])
+        setLoadingRecs(false)
+      })
+      .catch(() => {
+        setRecommendations([])
+        setSkillPredictions([])
+        setQuickWins([])
+        setLoadingRecs(false)
+      })
+
+    fetch(`http://localhost:8000/api/dashboard/${uid}`)
+      .then(r => r.json())
+      .then((d) => {
+        if (d && d.averageSkillLevel) setAvgLevelDisplay(d.averageSkillLevel)
+      })
+      .catch(() => {})
   }, [])
 
-  const handleGenerate = async () => {
-    if (!goal.trim()) return
-    setGenerating(true); setGenStatus("idle")
-    const uid = localStorage.getItem("hackai_user_id") || "user-1"
-    try {
-      await fetch(`http://localhost:8000/api/graph/${uid}`, { method: "DELETE" })
-      const res = await fetch("http://localhost:8000/api/generate-graph", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: uid, goal: goal.trim(), force: true }),
-      })
-      if (!res.ok) throw new Error("failed")
-      const data = await res.json()
-      localStorage.setItem("hackai_goal", goal.trim())
-      if (data.goal_id != null) localStorage.setItem("hackai_goal_id", String(data.goal_id))
-      setSavedGoal(goal.trim())
-      setGenStatus("success")
-      setTimeout(() => router.push("/mindmap"), 900)
-    } catch { setGenStatus("error") }
-    finally { setGenerating(false) }
-  }
-
   const completedCount = nodes.filter(n => n.status === "completed").length
-  const avgLevel = nodes.length > 0 ? (nodes.reduce((s, n) => s + n.level, 0) / nodes.length).toFixed(1) : "—"
 
   const statusColors: Record<string, string> = {
     completed:     "bg-success/10 text-success border-success/30",
@@ -86,47 +114,8 @@ export default function AssessmentPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Skill Assessment</h1>
-          <p className="text-muted-foreground">Enter a topic to generate your personalised learning graph.</p>
+          <p className="text-muted-foreground">See your current skill levels and AI-powered next steps.</p>
         </div>
-
-        {/* Goal Input */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <CardTitle className="text-base">What do you want to learn?</CardTitle>
-            </div>
-            <CardDescription>Any topic — machine learning, quantum physics, guitar, cooking…</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input placeholder="e.g. machine learning, quantum physics, guitar..."
-                  value={goal} onChange={e => { setGoal(e.target.value); setGenStatus("idle") }}
-                  onKeyDown={e => e.key === "Enter" && handleGenerate()} className="pl-9" />
-              </div>
-              <Button onClick={handleGenerate} disabled={!goal.trim() || generating}>
-                {generating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Generating...</>
-                  : <><Sparkles className="mr-2 h-4 w-4" />Generate</>}
-              </Button>
-            </div>
-            {genStatus === "success" && (
-              <div className="flex items-center gap-2 text-sm text-success">
-                <CheckCircle2 className="h-4 w-4" /> Graph generated! Redirecting to mind map...
-              </div>
-            )}
-            {genStatus === "error" && (
-              <p className="text-sm text-destructive">Generation failed — make sure the backend is running.</p>
-            )}
-            {savedGoal && savedGoal !== goal && (
-              <p className="text-xs text-muted-foreground">
-                Current topic: <span className="text-primary font-medium">{savedGoal}</span>
-                {" · "}<button onClick={() => router.push("/mindmap")} className="underline hover:text-foreground">View mind map →</button>
-              </p>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Progress summary */}
         {savedGoal && nodes.length > 0 && (
@@ -146,7 +135,7 @@ export default function AssessmentPage() {
                   <div className="h-10 w-px bg-border" />
                   <div>
                     <p className="text-sm text-muted-foreground">Avg Level</p>
-                    <p className="text-2xl font-bold text-primary">{avgLevel}/5</p>
+                    <p className="text-2xl font-bold text-primary">{avgLevelDisplay}</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -210,12 +199,132 @@ export default function AssessmentPage() {
         ) : (
           <Card>
             <CardContent className="p-10 text-center space-y-2">
-              <Sparkles className="h-10 w-10 text-muted-foreground mx-auto" />
+              <Target className="h-10 w-10 text-muted-foreground mx-auto" />
               <p className="font-medium text-foreground">No learning graph yet</p>
-              <p className="text-sm text-muted-foreground">Enter a topic above and hit Generate.</p>
+              <p className="text-sm text-muted-foreground">Go to the Learn tab to create your first learning map.</p>
             </CardContent>
           </Card>
         )}
+
+        {/* AI recommendations (from former Recommendations tab) */}
+        {!loadingRecs && (recommendations.length > 0 || skillPredictions.length > 0 || quickWins.length > 0) && (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-base">Recommended Next Topics</CardTitle>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => router.push("/practice")}>
+                    Practice Now <ArrowRight className="ml-1 h-3 w-3" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {recommendations.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Complete a few concepts to unlock personalised recommendations.
+                  </p>
+                ) : (
+                  recommendations.slice(0, 3).map((rec) => (
+                    <RecommendationCard
+                      key={rec.id}
+                      title={rec.topic}
+                      description={rec.reason}
+                      reason={rec.benefits?.[0] || "High-impact next step in your path."}
+                      improvement={`Up to ${rec.predictedLevel}/5 skill on this topic`}
+                      difficulty={rec.currentLevel <= 1 ? "Beginner" : rec.currentLevel <= 3 ? "Intermediate" : "Advanced"}
+                      href={`/practice?topic=${encodeURIComponent(rec.topic)}`}
+                    />
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-base">Skill Outlook & Quick Wins</CardTitle>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {/* Skill improvement prediction (from old Recommendations page) */}
+                {skillPredictions.length > 0 && (
+                  <div className="space-y-3">
+                    {skillPredictions.slice(0, 4).map((item) => (
+                      <div key={item.skill} className="rounded-lg border border-border bg-secondary/30 p-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-sm font-medium text-foreground truncate max-w-[150px]">
+                            {item.skill}
+                          </p>
+                          <Badge className="bg-success/10 text-success border-success/30 text-xs">
+                            {item.change}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full bg-muted-foreground/40 rounded-full"
+                              style={{ width: `${(item.current / 5) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {item.current}/5
+                          </span>
+                          <span className="text-xs text-muted-foreground">→</span>
+                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full"
+                              style={{ width: `${(item.predicted / 5) * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-medium text-primary">
+                            {item.predicted}/5
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quick wins list */}
+                {quickWins.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Quick Wins
+                    </p>
+                    {quickWins.slice(0, 3).map((win) => (
+                      <button
+                        key={win.topic}
+                        onClick={() => router.push(`/practice?topic=${encodeURIComponent(win.topic)}`)}
+                        className="flex w-full items-center justify-between rounded-lg border border-border px-3 py-2 text-sm hover:border-primary/30 hover:bg-secondary/40 transition-colors"
+                      >
+                        <span className="text-left">
+                          <span className="block font-medium text-foreground">{win.topic}</span>
+                          <span className="block text-xs text-muted-foreground">{win.time}</span>
+                        </span>
+                        <Badge className="bg-success/10 text-success border-success/30 text-xs">
+                          {win.boost}
+                        </Badge>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {skillPredictions.length === 0 && quickWins.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Start completing topics to see skill predictions and quick wins.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
       </div>
     </AppShell>
   )
