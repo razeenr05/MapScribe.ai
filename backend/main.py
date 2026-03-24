@@ -18,11 +18,11 @@ run_migrations()
 
 
 def _cors_allow_origins() -> list[str]:
-    """localhost for dev; add production frontends via CORS_ORIGINS (comma-separated)."""
+    """localhost for dev; add production frontends via CORS_ORIGINS or CORS_ORIGIN (comma-separated)."""
     origins: list[str] = ["http://localhost:3000"]
-    extra = os.getenv("CORS_ORIGINS", "")
+    extra = os.getenv("CORS_ORIGINS") or os.getenv("CORS_ORIGIN") or ""
     for part in extra.split(","):
-        o = part.strip()
+        o = part.strip().rstrip("/")
         if o and o not in origins:
             origins.append(o)
     return origins
