@@ -1,4 +1,4 @@
-const API = "http://localhost:8000"
+import { API_BASE } from "@/lib/api"
 
 export interface AuthUser {
   id: string
@@ -47,7 +47,7 @@ export function clearAuth() {
 // ---------------------------------------------------------------------------
 
 async function authFetch(path: string, body: object) {
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

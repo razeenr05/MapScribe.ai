@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { AppShell } from "@/components/app-shell"
+import { API_BASE } from "@/lib/api"
 
 const suggestions = [
   "basketball fundamentals",
@@ -21,8 +22,6 @@ const suggestions = [
   "chess strategy",
   "video editing",
 ]
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 interface LearningGoalItem {
   id: number

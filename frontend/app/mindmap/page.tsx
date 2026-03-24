@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { AppShell } from "@/components/app-shell"
 import { KnowledgeGraph } from "@/components/mindmap/knowledge-graph"
 import { Card, CardContent } from "@/components/ui/card"
+import { API_BASE } from "@/lib/api"
 
 const legendItems = [
   { status: "Completed",   color: "bg-success"    },
@@ -19,7 +20,7 @@ export default function MindMapPage() {
   useEffect(() => {
     const userId = localStorage.getItem("hackai_user_id") || "user-1"
     // Always fetch goal from the backend (source of truth) to avoid stale localStorage
-    fetch(`http://localhost:8000/api/goal/${userId}`)
+    fetch(`${API_BASE}/api/goal/${userId}`)
       .then((r) => r.json())
       .then((d) => {
         const g = d.goal || localStorage.getItem("hackai_goal") || "your topic"

@@ -11,6 +11,7 @@ import {
   Lightbulb, TrendingUp, Target, ArrowRight, Sparkles,
   Brain, BarChart3, CheckCircle2, Zap, BookOpen, Loader2,
 } from "lucide-react"
+import { API_BASE } from "@/lib/api"
 
 interface Recommendation {
   id: string
@@ -62,7 +63,7 @@ export default function RecommendationsPage() {
     const userId = localStorage.getItem("hackai_user_id") || "user-1"
     setGoal(localStorage.getItem("hackai_goal") || "your topic")
     try {
-      const res = await fetch(`http://localhost:8000/api/recommendations/${userId}`)
+      const res = await fetch(`${API_BASE}/api/recommendations/${userId}`)
       if (!res.ok) throw new Error("Failed")
       const d = await res.json()
       setData(d)

@@ -14,11 +14,23 @@ import auth as auth_module
 models.Base.metadata.create_all(bind=engine)
 run_migrations()
 
+
+def _cors_allow_origins() -> list[str]:
+    """localhost for dev; add production frontends via CORS_ORIGINS (comma-separated)."""
+    origins: list[str] = ["http://localhost:3000"]
+    extra = os.getenv("CORS_ORIGINS", "")
+    for part in extra.split(","):
+        o = part.strip()
+        if o and o not in origins:
+            origins.append(o)
+    return origins
+
+
 app = FastAPI(title="HackAI API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=_cors_allow_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

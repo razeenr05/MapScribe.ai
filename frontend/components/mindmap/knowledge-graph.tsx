@@ -19,6 +19,7 @@ import "@xyflow/react/dist/style.css"
 
 import { ConceptNode, type ConceptNodeData, type ConceptStatus } from "./concept-node"
 import { ConceptPanel } from "./concept-panel"
+import { API_BASE } from "@/lib/api"
 
 interface ConceptDetails {
   id: string
@@ -48,7 +49,7 @@ export function KnowledgeGraph() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`http://localhost:8000/api/mindmap/${userId}`)
+      const res = await fetch(`${API_BASE}/api/mindmap/${userId}`)
       if (!res.ok) throw new Error("Failed to load mind map")
       const data = await res.json()
 
@@ -96,7 +97,7 @@ export function KnowledgeGraph() {
 
   const onNodeClick = useCallback(async (_event: React.MouseEvent, node: Node) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/nodes/${node.id}`)
+      const res = await fetch(`${API_BASE}/api/nodes/${node.id}`)
       if (!res.ok) return
       const data: ConceptDetails = await res.json()
       // Use live status from the node in state (may differ from DB row status)
@@ -107,13 +108,13 @@ export function KnowledgeGraph() {
 
   const handleMarkStart = useCallback(async (nodeId: string) => {
     try {
-      await fetch("http://localhost:8000/api/progress/start", {
+      await fetch(`${API_BASE}/api/progress/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId, node_id: nodeId }),
       })
       await loadGraph()
-      const res = await fetch(`http://localhost:8000/api/nodes/${nodeId}`)
+      const res = await fetch(`${API_BASE}/api/nodes/${nodeId}`)
       if (res.ok) {
         const updated = await res.json()
         setSelectedConcept({ ...updated, status: "in-progress" })
@@ -123,13 +124,13 @@ export function KnowledgeGraph() {
 
   const handleMarkComplete = useCallback(async (nodeId: string) => {
     try {
-      await fetch("http://localhost:8000/api/progress/complete", {
+      await fetch(`${API_BASE}/api/progress/complete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId, node_id: nodeId }),
       })
       await loadGraph()
-      const res = await fetch(`http://localhost:8000/api/nodes/${nodeId}`)
+      const res = await fetch(`${API_BASE}/api/nodes/${nodeId}`)
       if (res.ok) {
         const updated = await res.json()
         setSelectedConcept({ ...updated, status: "completed" })
@@ -139,13 +140,13 @@ export function KnowledgeGraph() {
 
   const handleMarkWeak = useCallback(async (nodeId: string) => {
     try {
-      await fetch("http://localhost:8000/api/progress/weak", {
+      await fetch(`${API_BASE}/api/progress/weak`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId, node_id: nodeId }),
       })
       await loadGraph()
-      const res = await fetch(`http://localhost:8000/api/nodes/${nodeId}`)
+      const res = await fetch(`${API_BASE}/api/nodes/${nodeId}`)
       if (res.ok) {
         const updated = await res.json()
         setSelectedConcept({ ...updated, status: "weak" })
@@ -157,13 +158,13 @@ export function KnowledgeGraph() {
 
   const handleMarkUncomplete = useCallback(async (nodeId: string) => {
     try {
-      await fetch("http://localhost:8000/api/progress/uncomplete", {
+      await fetch(`${API_BASE}/api/progress/uncomplete`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId, node_id: nodeId }),
       })
       await loadGraph()
-      const res = await fetch(`http://localhost:8000/api/nodes/${nodeId}`)
+      const res = await fetch(`${API_BASE}/api/nodes/${nodeId}`)
       if (res.ok) {
         const updated = await res.json()
         setSelectedConcept({ ...updated, status: "recommended" })

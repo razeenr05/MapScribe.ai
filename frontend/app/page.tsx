@@ -15,6 +15,7 @@ import {
   BookOpen, Target, TrendingUp, Clock,
   AlertTriangle, CheckCircle2, ArrowRight, Loader2,
 } from "lucide-react"
+import { API_BASE } from "@/lib/api"
 
 interface DashboardData {
   conceptsLearned: number
@@ -39,7 +40,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const userId = localStorage.getItem("hackai_user_id") || "user-1"
-    fetch(`http://localhost:8000/api/dashboard/${userId}`)
+    fetch(`${API_BASE}/api/dashboard/${userId}`)
       .then((r) => { if (!r.ok) throw new Error("Failed"); return r.json() })
       .then((d) => { setData(d); setLoading(false) })
       .catch((e) => { setError(e.message); setLoading(false) })

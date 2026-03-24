@@ -21,6 +21,7 @@ import {
   Clock,
   ChevronUp,
 } from "lucide-react"
+import { API_BASE } from "@/lib/api"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -122,7 +123,7 @@ function ResourceCard({ resource }: { resource: Resource }) {
     try {
       // Use just the resource title — shorter = better yt-dlp results
       const res = await fetch(
-        `http://localhost:8000/api/snippet/search?topic=${encodeURIComponent(resource.title)}`
+        `${API_BASE}/api/snippet/search?topic=${encodeURIComponent(resource.title)}`
       )
       if (!res.ok) throw new Error("Search failed")
       const data: Snippet = await res.json()
@@ -291,7 +292,7 @@ export default function ResourcesPage() {
 
   useEffect(() => {
     const uid = typeof window !== "undefined" ? (localStorage.getItem("hackai_user_id") || "user-1") : "user-1"
-    fetch(`http://localhost:8000/api/resources?user_id=${encodeURIComponent(uid)}`)
+    fetch(`${API_BASE}/api/resources?user_id=${encodeURIComponent(uid)}`)
       .then((res) => { if (!res.ok) throw new Error("Failed to load resources"); return res.json() })
       .then((data) => { setResources(data); setLoading(false) })
       .catch((err) => { setError(err.message); setLoading(false) })

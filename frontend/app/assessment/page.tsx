@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, BookOpen, Lightbulb, Target, Zap, Loader2 } from "lucide-react"
 import { RecommendationCard } from "@/components/cards/recommendation-card"
+import { API_BASE } from "@/lib/api"
 
 interface NodeSkill {
   id: string
@@ -60,12 +61,12 @@ export default function AssessmentPage() {
     const uid = localStorage.getItem("hackai_user_id") || "user-1"
     const localGoal = localStorage.getItem("hackai_goal") || ""
 
-    fetch(`http://localhost:8000/api/goal/${uid}`)
+    fetch(`${API_BASE}/api/goal/${uid}`)
       .then(r => r.json())
       .then(d => { const g = d.goal || localGoal; setSavedGoal(g) })
       .catch(() => { setSavedGoal(localGoal) })
 
-    fetch(`http://localhost:8000/api/mindmap/${uid}`)
+    fetch(`${API_BASE}/api/mindmap/${uid}`)
       .then(r => r.json())
       .then(d => {
         setNodes((d.nodes || []).map((n: any) => ({
@@ -76,7 +77,7 @@ export default function AssessmentPage() {
       })
       .catch(() => setLoadingNodes(false))
 
-    fetch(`http://localhost:8000/api/recommendations/${uid}`)
+    fetch(`${API_BASE}/api/recommendations/${uid}`)
       .then(r => r.json())
       .then((d) => {
         setRecommendations(d.recommendations || [])
@@ -91,7 +92,7 @@ export default function AssessmentPage() {
         setLoadingRecs(false)
       })
 
-    fetch(`http://localhost:8000/api/dashboard/${uid}`)
+    fetch(`${API_BASE}/api/dashboard/${uid}`)
       .then(r => r.json())
       .then((d) => {
         if (d && d.averageSkillLevel) setAvgLevelDisplay(d.averageSkillLevel)

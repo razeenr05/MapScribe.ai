@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Search, Trophy, Target, Flame, Loader2 } from "lucide-react"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+import { API_BASE } from "@/lib/api"
 
 interface Problem {
   id: string

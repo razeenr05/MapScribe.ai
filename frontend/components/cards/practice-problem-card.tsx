@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { API_BASE } from "@/lib/api"
 
 type Difficulty = "Easy" | "Medium" | "Hard"
 
@@ -75,7 +76,7 @@ export function PracticeProblemCard({
     setModalOpen(true)
     setLoadingMC(true)
     try {
-      const res = await fetch("http://localhost:8000/api/generate-choices", {
+      const res = await fetch(`${API_BASE}/api/generate-choices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: title, topic }),
@@ -105,7 +106,7 @@ export function PracticeProblemCard({
       const strikes = recordWeakStrike(node_id)
       if (strikes >= WEAK_STRIKE_THRESHOLD) {
         const userId = getUserId()
-        fetch("http://localhost:8000/api/progress/weak", {
+        fetch(`${API_BASE}/api/progress/weak`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: userId, node_id }),
