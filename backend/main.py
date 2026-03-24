@@ -7,6 +7,8 @@ import math
 import os
 import json
 
+from sqlalchemy import inspect
+
 from database import get_db, engine, run_migrations
 import models
 import auth as auth_module
@@ -212,6 +214,20 @@ def _wipe_user_graph(user_id: str, db: Session, goal_id: Optional[int] = None):
 @app.get("/", tags=["health"])
 def health_check():
     return {"status": "ok", "message": "HackAI API is running"}
+
+
+@app.get("/api/health/db", tags=["health"])
+def health_db():
+    """Which DB the app uses + table names (debug Railway / Postgres wiring)."""
+    insp = inspect(engine)
+    url = engine.url
+    return {
+        "dialect": engine.dialect.name,
+        "host": getattr(url, "host", None),
+        "database": getattr(url, "database", None),
+        "table_count": len(insp.get_table_names()),
+        "tables": sorted(insp.get_table_names()),
+    }
 
 
 @app.post("/api/goal", tags=["goal"])
