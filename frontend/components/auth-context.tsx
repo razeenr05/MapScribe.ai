@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveAuth(data.access_token, data.user)
     setToken(data.access_token)
     setUser(data.user)
-    router.replace("/")
+    router.replace("/learn")
   }
 
   const login = async (email: string, password: string) => {
